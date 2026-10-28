@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **OpenCode 2 model picker:** reasoning levels are published as variants of one model instead of one picker entry per level, using the same grouping as 1.x. Each variant maps to its concrete Cursor model through `body.cursorModel`.
+- **OpenCode 2 context windows:** models advertise the Cursor IDE catalog's window instead of a flat 200k. The max-mode window is used when the CLI labels the model `1M`; a conservative family fallback covers headless installs.
+
+### Fixed
+
+- Generated group names keep version segments together: `claude-opus-5-5` now renders as "Claude Opus 5.5", not "Claude Opus 5 5".
+
 ## [2.5.17] - 2026-10-23
 
 ### Fixed

@@ -30,6 +30,15 @@ describe("models/variants", () => {
     });
   });
 
+  it("formats version segments with dots in generated group names", () => {
+    const result = groupCursorModels([
+      { id: "claude-opus-5-5-low", name: "Claude Opus 5.5 Low" },
+      { id: "claude-opus-5-5-high", name: "Claude Opus 5.5 High" },
+    ]);
+
+    expect(result.groups[0].name).toBe("Claude Opus 5.5");
+  });
+
   it("keeps ambiguous product models direct", () => {
     const result = groupCursorModels([
       { id: "auto", name: "Auto" },

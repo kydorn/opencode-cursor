@@ -33,6 +33,8 @@ type OpenCodeConfig = {
 export type DiscoveredModel = {
   id: string;
   name: string;
+  /** Context window when the IDE catalog supplied one. */
+  context?: number;
 };
 
 export async function discoverModelsForRefresh(

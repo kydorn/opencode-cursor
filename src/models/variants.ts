@@ -196,14 +196,29 @@ function getDefaultMember(members: CursorModelVariant[]): CursorModelVariant {
 }
 
 function formatModelName(modelId: string): string {
-  return modelId
-    .split("-")
-    .map(part => {
-      if (part === "gpt") return "GPT";
-      if (part === "xhigh") return "XHigh";
-      return part.charAt(0).toUpperCase() + part.slice(1);
-    })
-    .join(" ");
+  const parts = modelId.split("-");
+  let name = "";
+
+  for (let index = 0; index < parts.length; index++) {
+    const part = parts[index];
+    const label = part === "gpt"
+      ? "GPT"
+      : part === "xhigh"
+        ? "XHigh"
+        : part.charAt(0).toUpperCase() + part.slice(1);
+
+    if (index === 0) {
+      name = label;
+      continue;
+    }
+
+    // "claude-opus-5-5" and "muse-wonder-1.0" are versions, not words.
+    const previous = parts[index - 1];
+    const numeric = /^\d+(?:\.\d+)?$/;
+    name += numeric.test(part) && numeric.test(previous) ? `.${part}` : ` ${label}`;
+  }
+
+  return name;
 }
 
 function compareVariants(a: CursorModelVariant, b: CursorModelVariant): number {

@@ -9,6 +9,8 @@ const MODEL_DISCOVERY_TIMEOUT_MS = 5000;
 export type DiscoveredModel = {
   id: string;
   name: string;
+  /** Context window when the IDE catalog supplied one. */
+  context?: number;
 };
 
 export function parseCursorModelsOutput(output: string): DiscoveredModel[] {

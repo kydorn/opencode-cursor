@@ -1,5 +1,7 @@
 import { CURSOR_PROVIDER_ID } from "../plugin.js";
+import { getCursorModelContext } from "../models/limits.js";
 import { getCursorModelCost, toOpenCode2Costs } from "../models/pricing.js";
+import { groupCursorModels, type CursorModelGroup } from "../models/variants.js";
 import type { DiscoveredModel } from "../models/sync.js";
 import type { ConnectionInfo, ModelInfo2, ProviderEditor } from "./types.js";
 
@@ -21,36 +23,93 @@ export const CURSOR_INTEGRATION_ID = CURSOR_PROVIDER_ID;
  */
 export const CURSOR_AISDK_PACKAGE = "aisdk:@ai-sdk/openai-compatible";
 
-const DEFAULT_CONTEXT = 200_000;
 const DEFAULT_OUTPUT = 8192;
 
-/** Translate one discovered Cursor model into the 2.0 `Model.Info` shape. */
-export function discoveredModelToInfo(model: DiscoveredModel): ModelInfo2 {
-  const cost = toOpenCode2Costs(getCursorModelCost(model.id));
+function modelInfo(
+  id: string,
+  modelID: string,
+  name: string,
+  context: number,
+  costModelId: string,
+): ModelInfo2 {
   return {
-    id: model.id,
-    modelID: model.id,
+    id,
+    modelID,
     providerID: CURSOR_PROVIDER_ID,
-    name: model.name || model.id,
+    name,
     capabilities: {
       tools: true,
       input: ["text"],
       output: ["text"],
     },
     limit: {
-      context: DEFAULT_CONTEXT,
+      context,
       output: DEFAULT_OUTPUT,
     },
     variants: [],
     status: "active",
     enabled: true,
     time: { released: 0 },
-    cost,
+    cost: toOpenCode2Costs(getCursorModelCost(costModelId)),
+  };
+}
+
+function contextFor(
+  model: DiscoveredModel | undefined,
+  fallbackId: string,
+  fallbackName: string,
+): number {
+  if (model) return model.context ?? getCursorModelContext(model.id, model.name);
+  return getCursorModelContext(fallbackId, fallbackName);
+}
+
+/** Translate one discovered Cursor model into the 2.0 `Model.Info` shape. */
+export function discoveredModelToInfo(model: DiscoveredModel): ModelInfo2 {
+  return modelInfo(
+    model.id,
+    model.id,
+    model.name || model.id,
+    contextFor(model, model.id, model.name),
+    model.id,
+  );
+}
+
+/**
+ * Reasoning levels live in one model with variants. `modelID` and the base
+ * body point at the default level, so a request without a variant still runs;
+ * the selected variant's body switches the proxy to its concrete Cursor id.
+ */
+function groupedModelToInfo(
+  group: CursorModelGroup,
+  byId: ReadonlyMap<string, DiscoveredModel>,
+): ModelInfo2 {
+  const defaultModel = byId.get(group.defaultCursorModelId);
+  const info = modelInfo(
+    group.baseId,
+    group.defaultCursorModelId,
+    group.name,
+    contextFor(defaultModel, group.defaultCursorModelId, group.name),
+    group.defaultCursorModelId,
+  );
+
+  return {
+    ...info,
+    body: { cursorModel: group.defaultCursorModelId },
+    variants: Object.entries(group.variants).map(([id, cursorModel]) => ({
+      id,
+      body: { cursorModel },
+    })),
   };
 }
 
 export function modelsToInventory(models: readonly DiscoveredModel[]): ModelInfo2[] {
-  return models.map(discoveredModelToInfo);
+  const { groups, direct } = groupCursorModels([...models]);
+  const byId = new Map(models.map((model) => [model.id, model]));
+
+  return [
+    ...groups.map((group) => groupedModelToInfo(group, byId)),
+    ...direct.map(discoveredModelToInfo),
+  ];
 }
 
 /**

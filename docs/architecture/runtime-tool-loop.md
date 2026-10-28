@@ -91,7 +91,7 @@ The boundary abstraction is implemented in `src/provider/boundary.ts` and runtim
 
 ## Model Variant Resolution
 
-OpenCode sends custom model option fields in the provider request body. When a model variant defines `cursorModel`, OpenCode merges the selected variant value into `body.cursorModel` before the request reaches `cursor-acp`.
+OpenCode sends custom model option fields in the provider request body. When a model variant defines `cursorModel`, OpenCode merges the selected variant value into `body.cursorModel` before the request reaches `cursor-acp`. On OpenCode 2.0 the plugin writes the target directly into the variant's `body.cursorModel`.
 
 The provider boundary resolves the runtime Cursor model in this order:
 

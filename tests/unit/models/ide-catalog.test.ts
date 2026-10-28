@@ -81,6 +81,58 @@ describe("models/ide-catalog", () => {
     expect(merged.find((model) => model.id === "glm-5p3-flash")?.name).toBe("GLM 5.3 Flash");
   });
 
+  it("carries context windows from the IDE catalog and the CLI's max-mode label", () => {
+    const catalog: IdeCatalog = {
+      availableDefaultModels2: [
+        {
+          name: "gpt-5.5",
+          clientDisplayName: "GPT-5.5",
+          supportsAgent: true,
+          legacySlugs: ["gpt-5.5-low"],
+          contextTokenLimit: 272_000,
+          contextTokenLimitForMaxMode: 1_000_000,
+        },
+        {
+          name: "claude-sonnet-5-5",
+          clientDisplayName: "Claude Sonnet 5.5",
+          supportsAgent: true,
+          legacySlugs: ["claude-sonnet-5-5-medium"],
+          contextTokenLimit: 300_000,
+          contextTokenLimitForMaxMode: 1_000_000,
+        },
+      ],
+      aiSettings: { modelOverrideEnabled: ["gpt-5.5", "claude-sonnet-5-5"] },
+    };
+
+    const merged = mergeIdeEnabledModels(
+      [
+        { id: "gpt-5.5-low", name: "GPT-5.5 1M Low" },
+        { id: "claude-sonnet-5-5-medium", name: "Claude Sonnet 5.5 Medium" },
+      ],
+      catalog,
+    );
+
+    expect(merged.find((model) => model.id === "gpt-5.5-low")?.context).toBe(1_000_000);
+    expect(merged.find((model) => model.id === "claude-sonnet-5-5-medium")?.context).toBe(300_000);
+  });
+
+  it("includes the context window for models discovered only from the IDE", () => {
+    const merged = mergeIdeEnabledModels([], {
+      availableDefaultModels2: [
+        {
+          name: "glm-5p3",
+          clientDisplayName: "GLM 5.3",
+          supportsAgent: true,
+          legacySlugs: ["glm-5p3-high"],
+          contextTokenLimit: 1_000_000,
+        },
+      ],
+      aiSettings: { modelOverrideEnabled: ["glm-5p3"] },
+    });
+
+    expect(merged).toEqual([{ id: "glm-5p3-high", name: "GLM 5.3", context: 1_000_000 }]);
+  });
+
   it("does not duplicate a family the CLI already lists", () => {
     const merged = mergeIdeEnabledModels(
       [{ id: "glm-5.2-high", name: "GLM 5.2" }],

@@ -45,6 +45,8 @@ export type ProviderInfo = {
 export type ModelVariantInfo = {
   id: string;
   settings?: Record<string, unknown>;
+  /** Request-body fields merged over the model's body when this variant runs. */
+  body?: Record<string, unknown>;
 };
 
 export type ModelInfo2 = {
@@ -65,6 +67,8 @@ export type ModelInfo2 = {
   enabled: boolean;
   limit: { context: number; input?: number; output: number };
   settings?: Record<string, unknown>;
+  /** Request-body fields merged into every request for this model. */
+  body?: Record<string, unknown>;
 };
 
 export type CredentialKey = {

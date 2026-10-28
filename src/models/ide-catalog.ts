@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { DiscoveredModel } from "../cli/model-discovery.js";
+import { parseContextWindow } from "./limits.js";
 
 /**
  * Cursor Settings → Models can enable agent models that `cursor-agent models`
@@ -34,6 +35,10 @@ export type IdeCatalogModel = {
   defaultOn?: boolean;
   legacySlugs?: string[];
   variants?: IdeCatalogVariant[];
+  /** Standard context window, from the IDE's model catalog. */
+  contextTokenLimit?: number;
+  /** Max-mode context window, from the IDE's model catalog. */
+  contextTokenLimitForMaxMode?: number;
 };
 
 export type IdeCatalog = {
@@ -107,6 +112,34 @@ function isEnabled(model: IdeCatalogModel, catalog: IdeCatalog): boolean {
   return catalog.aiSettings?.modelOverrideEnabled?.includes(name) === true;
 }
 
+function catalogContext(model: IdeCatalogModel, displayName: string | undefined): number | undefined {
+  // The CLI labels max-mode ids with their window ("GPT-5.5 1M High"); the
+  // catalog lists the same slug for both normal and max mode.
+  return parseContextWindow(displayName)
+    ?? model.contextTokenLimit
+    ?? model.contextTokenLimitForMaxMode;
+}
+
+function withCatalogContext(
+  model: DiscoveredModel,
+  catalogModel: IdeCatalogModel | undefined,
+): DiscoveredModel {
+  if (!catalogModel || model.context !== undefined) return model;
+
+  const context = catalogContext(catalogModel, model.name);
+  return context === undefined ? model : { ...model, context };
+}
+
+function catalogModelsById(catalog: IdeCatalog): Map<string, IdeCatalogModel> {
+  const byId = new Map<string, IdeCatalogModel>();
+  for (const model of catalog.availableDefaultModels2 ?? []) {
+    for (const id of [model.name, model.serverModelName, ...selectableIds(model)]) {
+      if (id) byId.set(id, model);
+    }
+  }
+  return byId;
+}
+
 /**
  * Add agent models the user enabled in the Cursor picker when none of their
  * selectable ids are already in the CLI catalog.
@@ -117,7 +150,9 @@ export function mergeIdeEnabledModels(
 ): DiscoveredModel[] {
   if (!catalog?.availableDefaultModels2?.length) return [...cliModels];
 
-  const seen = new Set(cliModels.map((model) => model.id));
+  const byId = catalogModelsById(catalog);
+  const enriched = cliModels.map((model) => withCatalogContext(model, byId.get(model.id)));
+  const seen = new Set(enriched.map((model) => model.id));
   const extras: DiscoveredModel[] = [];
 
   for (const model of catalog.availableDefaultModels2) {
@@ -131,11 +166,11 @@ export function mergeIdeEnabledModels(
     for (const id of ids) {
       if (seen.has(id)) continue;
       seen.add(id);
-      extras.push({ id, name: displayNameForSlug(model, id) });
+      extras.push(withCatalogContext({ id, name: displayNameForSlug(model, id) }, model));
     }
   }
 
-  return extras.length === 0 ? [...cliModels] : [...cliModels, ...extras];
+  return extras.length === 0 ? enriched : [...enriched, ...extras];
 }
 
 export function extractIdeCatalog(storage: unknown): IdeCatalog | null {

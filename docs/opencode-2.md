@@ -99,6 +99,14 @@ until model discovery finishes, a few seconds after OpenCode starts. The
 plugin runs discovery again with the active Cursor key after `/connect` or a
 credential switch.
 
+Reasoning levels are grouped under one model as variants (for example
+`gpt-5.5` with `none`, `low`, `medium`, `high`, and `extra-high`), matching the
+1.x compact model list. Selecting a variant sends its concrete Cursor model id
+as `body.cursorModel`; selecting the base model uses the default level. Context
+windows come from the Cursor IDE catalog when it is available, including the
+max-mode window for models the CLI labels `1M`; headless installs fall back to
+conservative family sizes.
+
 ## Tools
 
 The OpenCode 2.0 entry registers **no plugin tools**. OpenCode 2.0 ships its
