@@ -38,6 +38,7 @@ export function fallbackCursorContext(modelId: string): number {
   if (modelId.startsWith("composer-")) return 200_000;
   if (modelId.startsWith("kimi-k3")) return 1_048_576;
   if (modelId.startsWith("glm-")) return 1_000_000;
+  if (modelId.startsWith("deepseek-v41")) return 1_048_576;
   if (modelId.startsWith("muse-")) return 300_000;
 
   if (modelId.startsWith("claude-")) {

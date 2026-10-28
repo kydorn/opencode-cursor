@@ -15,6 +15,7 @@ describe("models/limits", () => {
     expect(getCursorModelContext("composer-2.5")).toBe(200_000);
     expect(getCursorModelContext("claude-sonnet-5-5")).toBe(300_000);
     expect(getCursorModelContext("gpt-5.5-low")).toBe(272_000);
+    expect(getCursorModelContext("deepseek-v41-flash-1017-low")).toBe(1_048_576);
     expect(getCursorModelContext("unknown-model")).toBe(200_000);
   });
 });
