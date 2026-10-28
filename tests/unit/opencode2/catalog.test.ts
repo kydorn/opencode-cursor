@@ -33,6 +33,20 @@ describe("opencode2/catalog", () => {
     expect(info.modelID).toBe("gemini-3-flash");
     expect(info.variants).toEqual([]);
     expect(info.limit.context).toBe(1_000_000);
+    expect(info.capabilities.input).toEqual(["text", "image"]);
+  });
+
+  it("advertises image input only for models that support it", () => {
+    const inventory = modelsToInventory([
+      { id: "gpt-5.5-low", name: "GPT-5.5 1M Low", vision: true },
+      { id: "gpt-5.5-high", name: "GPT-5.5 1M High", vision: true },
+      { id: "composer-2.5", name: "Composer 2.5", vision: false },
+    ]);
+
+    expect(inventory.find((model) => model.id === "gpt-5.5")?.capabilities.input)
+      .toEqual(["text", "image"]);
+    expect(inventory.find((model) => model.id === "composer-2.5")?.capabilities.input)
+      .toEqual(["text"]);
   });
 
   it("uses the Cursor default for models without a known window", () => {

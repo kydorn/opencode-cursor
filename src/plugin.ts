@@ -32,6 +32,11 @@ import { parseAgentError, formatErrorForUser, stripAnsi, isResumeSpecificFailure
 import { buildPromptFromMessages, buildToolFingerprint } from "./proxy/prompt-builder.js";
 import { extractImagesFromMessages, type SdkImageLike } from "./proxy/image-extract.js";
 import {
+  cleanupCliImages,
+  materializeImagesForCli,
+  type CliImages,
+} from "./proxy/cli-images.js";
+import {
   applyBridgeJsonPrompt,
   BridgeJsonStreamDetector,
   extractBridgeToolCallsFromStreamOutput,
@@ -335,6 +340,7 @@ export function buildCursorAgentCommand(
   model: string,
   workspaceDirectory: string,
   resumeChatId?: string,
+  imagePaths: readonly string[] = [],
 ): string[] {
   const cmd = [
     resolveCursorAgentBinary(),
@@ -347,6 +353,9 @@ export function buildCursorAgentCommand(
     "--model",
     model,
   ];
+  for (const imagePath of imagePaths) {
+    cmd.push("--image", imagePath);
+  }
   if (resumeChatId) {
     if (RESUME_CHAT_ID_SAFE_RE.test(resumeChatId)) {
       cmd.push("--resume", resumeChatId);
@@ -617,25 +626,36 @@ function createCursorAgentBunChild(
   prompt: string,
   workspaceDirectory: string,
   resumeChatId?: string,
+  cliImages?: CliImages,
 ): any {
   const bunAny = globalThis as any;
   if (!bunAny.Bun?.spawn) {
     throw new Error("This provider requires Bun runtime.");
   }
 
-  const cmd = buildCursorAgentCommand(model, workspaceDirectory, resumeChatId);
+  const cmd = buildCursorAgentCommand(model, workspaceDirectory, resumeChatId, cliImages?.paths);
   const [command, args] = buildCursorAgentSpawnCommand(cmd[0], cmd.slice(1));
-  const child = bunAny.Bun.spawn({
-    cmd: [command, ...args],
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-    env: bunAny.Bun.env,
-  });
 
-  child.stdin.write(prompt);
-  child.stdin.end();
-  return child;
+  try {
+    const child = bunAny.Bun.spawn({
+      cmd: [command, ...args],
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: bunAny.Bun.env,
+    });
+
+    if (cliImages) {
+      void child.exited.finally(() => cleanupCliImages(cliImages.dir)).catch(() => {});
+    }
+
+    child.stdin.write(prompt);
+    child.stdin.end();
+    return child;
+  } catch (err) {
+    cleanupCliImages(cliImages?.dir);
+    throw err;
+  }
 }
 
 function createBunChildForBackend(input: {
@@ -647,6 +667,7 @@ function createBunChildForBackend(input: {
   resumeChatId?: string;
   params?: RuntimeModelParameter[];
   images?: SdkImageLike[];
+  cliImages?: CliImages;
 }): any {
   if (input.backend === "sdk") {
     if (!input.sdkApiKey) {
@@ -667,6 +688,7 @@ function createBunChildForBackend(input: {
     input.prompt,
     input.workspaceDirectory,
     input.resumeChatId,
+    input.cliImages,
   );
 }
 
@@ -675,16 +697,29 @@ function createCursorAgentNodeChild(
   prompt: string,
   workspaceDirectory: string,
   resumeChatId?: string,
+  cliImages?: CliImages,
 ): any {
-  const cmd = buildCursorAgentCommand(model, workspaceDirectory, resumeChatId);
+  const cmd = buildCursorAgentCommand(model, workspaceDirectory, resumeChatId, cliImages?.paths);
   const [command, args] = buildCursorAgentSpawnCommand(cmd[0], cmd.slice(1));
-  const child = spawn(command, args, {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
 
-  child.stdin.write(prompt);
-  child.stdin.end();
-  return child;
+  try {
+    const child = spawn(command, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    if (cliImages) {
+      const cleanup = () => cleanupCliImages(cliImages.dir);
+      child.once("close", cleanup);
+      child.once("error", cleanup);
+    }
+
+    child.stdin.write(prompt);
+    child.stdin.end();
+    return child;
+  } catch (err) {
+    cleanupCliImages(cliImages?.dir);
+    throw err;
+  }
 }
 
 function createNodeChildForBackend(input: {
@@ -696,6 +731,7 @@ function createNodeChildForBackend(input: {
   resumeChatId?: string;
   params?: RuntimeModelParameter[];
   images?: SdkImageLike[];
+  cliImages?: CliImages;
 }): any {
   if (input.backend === "sdk") {
     if (!input.sdkApiKey) {
@@ -711,7 +747,7 @@ function createNodeChildForBackend(input: {
     });
   }
 
-  if (isAgentPoolEnabled()) {
+  if (isAgentPoolEnabled() && !input.cliImages) {
     log.debug("Using cursor-agent pool for request", {
       model: input.model,
       resume: !!input.resumeChatId,
@@ -726,12 +762,36 @@ function createNodeChildForBackend(input: {
     });
   }
 
+  if (isAgentPoolEnabled() && input.cliImages) {
+    log.debug("Agent pool does not carry images; spawning cursor-agent directly", {
+      model: input.model,
+      imageCount: input.cliImages.paths.length,
+    });
+  }
+
   return createCursorAgentNodeChild(
     input.model,
     input.prompt,
     input.workspaceDirectory,
     input.resumeChatId,
+    input.cliImages,
   );
+}
+
+async function prepareCliImages(
+  backend: CursorRuntimeBackend,
+  images: readonly SdkImageLike[] | undefined,
+): Promise<CliImages | undefined> {
+  if (backend !== "cursor-agent" || !images || images.length === 0) return undefined;
+
+  try {
+    return await materializeImagesForCli(images);
+  } catch (err) {
+    log.warn("Failed to prepare images for cursor-agent; continuing without them", {
+      error: String(err),
+    });
+    return undefined;
+  }
 }
 
 function getOpenCodeConfigPrefix(): string {
@@ -1464,6 +1524,7 @@ async function startCursorProxyServer(workspaceDirectory: string, toolRouter: To
 
       reqPerf.mark("child-create-start");
       const images = extractImagesFromMessages(messages);
+      const cliImages = await prepareCliImages(backend, images);
       const child = createBunChildForBackend({
         backend,
         sdkApiKey,
@@ -1473,6 +1534,7 @@ async function startCursorProxyServer(workspaceDirectory: string, toolRouter: To
         resumeChatId,
         params,
         images,
+        cliImages,
       });
       reqPerf.mark("child-created");
 
@@ -2117,6 +2179,7 @@ async function startCursorProxyServer(workspaceDirectory: string, toolRouter: To
 
       reqPerf.mark("child-create-start");
       const images = extractImagesFromMessages(messages);
+      const cliImages = await prepareCliImages(backend, images);
       const child = createNodeChildForBackend({
         backend,
         sdkApiKey: sdkApiKeyNode,
@@ -2126,6 +2189,7 @@ async function startCursorProxyServer(workspaceDirectory: string, toolRouter: To
         resumeChatId,
         params,
         images,
+        cliImages,
       });
       reqPerf.mark("child-created");
 

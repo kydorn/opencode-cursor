@@ -1,4 +1,5 @@
 import { CURSOR_PROVIDER_ID } from "../plugin.js";
+import { supportsCursorImages } from "../models/capabilities.js";
 import { getCursorModelContext } from "../models/limits.js";
 import { getCursorModelCost, toOpenCode2Costs } from "../models/pricing.js";
 import { groupCursorModels, type CursorModelGroup } from "../models/variants.js";
@@ -30,6 +31,7 @@ function modelInfo(
   modelID: string,
   name: string,
   context: number,
+  vision: boolean,
   costModelId: string,
 ): ModelInfo2 {
   return {
@@ -39,7 +41,7 @@ function modelInfo(
     name,
     capabilities: {
       tools: true,
-      input: ["text"],
+      input: vision ? ["text", "image"] : ["text"],
       output: ["text"],
     },
     limit: {
@@ -63,6 +65,11 @@ function contextFor(
   return getCursorModelContext(fallbackId, fallbackName);
 }
 
+function visionFor(model: DiscoveredModel | undefined, fallbackId: string): boolean {
+  if (model?.vision !== undefined) return model.vision;
+  return supportsCursorImages(model?.id ?? fallbackId);
+}
+
 /** Translate one discovered Cursor model into the 2.0 `Model.Info` shape. */
 export function discoveredModelToInfo(model: DiscoveredModel): ModelInfo2 {
   return modelInfo(
@@ -70,6 +77,7 @@ export function discoveredModelToInfo(model: DiscoveredModel): ModelInfo2 {
     model.id,
     model.name || model.id,
     contextFor(model, model.id, model.name),
+    visionFor(model, model.id),
     model.id,
   );
 }
@@ -89,6 +97,7 @@ function groupedModelToInfo(
     group.defaultCursorModelId,
     group.name,
     contextFor(defaultModel, group.defaultCursorModelId, group.name),
+    visionFor(defaultModel, group.defaultCursorModelId),
     group.defaultCursorModelId,
   );
 

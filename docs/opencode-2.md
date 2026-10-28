@@ -105,7 +105,9 @@ Reasoning levels are grouped under one model as variants (for example
 as `body.cursorModel`; selecting the base model uses the default level. Context
 windows come from the Cursor IDE catalog when it is available, including the
 max-mode window for models the CLI labels `1M`; headless installs fall back to
-conservative family sizes.
+conservative family sizes. Models the catalog marks as image-capable advertise
+`image` input, so OpenCode offers attachments; the SDK forwards them directly
+and the CLI passes them to `cursor-agent --image`.
 
 ## Tools
 

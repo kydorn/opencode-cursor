@@ -276,6 +276,17 @@ describe("plugin resume orchestration", () => {
     expect(cmd).not.toContain("--resume");
   });
 
+  it("buildCursorAgentCommand passes image attachments", () => {
+    const cmd = buildCursorAgentCommand("gpt-5", "/workspace", undefined, [
+      "/tmp/one.png",
+      "/tmp/two.jpg",
+    ]);
+    const imageArgs = cmd.flatMap((part, index) =>
+      part === "--image" ? [part, cmd[index + 1]] : [],
+    );
+    expect(imageArgs).toEqual(["--image", "/tmp/one.png", "--image", "/tmp/two.jpg"]);
+  });
+
   it("opts into workspace trust only when explicitly configured", () => {
     const previous = process.env.CURSOR_ACP_TRUST_WORKSPACE;
     try {

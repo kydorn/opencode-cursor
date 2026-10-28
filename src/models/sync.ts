@@ -35,6 +35,8 @@ export type DiscoveredModel = {
   name: string;
   /** Context window when the IDE catalog supplied one. */
   context?: number;
+  /** Whether the model accepts image attachments. */
+  vision?: boolean;
 };
 
 export async function discoverModelsForRefresh(

@@ -116,6 +116,25 @@ describe("models/ide-catalog", () => {
     expect(merged.find((model) => model.id === "claude-sonnet-5-5-medium")?.context).toBe(300_000);
   });
 
+  it("carries image support from the IDE catalog", () => {
+    const merged = mergeIdeEnabledModels(
+      [{ id: "gpt-5.5-low", name: "GPT-5.5 1M Low" }],
+      {
+        availableDefaultModels2: [
+          {
+            name: "gpt-5.5",
+            supportsAgent: true,
+            legacySlugs: ["gpt-5.5-low"],
+            supportsImages: true,
+          },
+        ],
+        aiSettings: { modelOverrideEnabled: ["gpt-5.5"] },
+      },
+    );
+
+    expect(merged[0].vision).toBe(true);
+  });
+
   it("includes the context window for models discovered only from the IDE", () => {
     const merged = mergeIdeEnabledModels([], {
       availableDefaultModels2: [

@@ -39,6 +39,8 @@ export type IdeCatalogModel = {
   contextTokenLimit?: number;
   /** Max-mode context window, from the IDE's model catalog. */
   contextTokenLimitForMaxMode?: number;
+  /** Whether the model accepts image attachments. */
+  supportsImages?: boolean;
 };
 
 export type IdeCatalog = {
@@ -120,14 +122,22 @@ function catalogContext(model: IdeCatalogModel, displayName: string | undefined)
     ?? model.contextTokenLimitForMaxMode;
 }
 
-function withCatalogContext(
+function withCatalogMetadata(
   model: DiscoveredModel,
   catalogModel: IdeCatalogModel | undefined,
 ): DiscoveredModel {
-  if (!catalogModel || model.context !== undefined) return model;
+  if (!catalogModel) return model;
 
-  const context = catalogContext(catalogModel, model.name);
-  return context === undefined ? model : { ...model, context };
+  const next = { ...model };
+  if (next.context === undefined) {
+    const context = catalogContext(catalogModel, model.name);
+    if (context !== undefined) next.context = context;
+  }
+  if (next.vision === undefined && catalogModel.supportsImages !== undefined) {
+    next.vision = catalogModel.supportsImages;
+  }
+
+  return next;
 }
 
 function catalogModelsById(catalog: IdeCatalog): Map<string, IdeCatalogModel> {
@@ -151,7 +161,7 @@ export function mergeIdeEnabledModels(
   if (!catalog?.availableDefaultModels2?.length) return [...cliModels];
 
   const byId = catalogModelsById(catalog);
-  const enriched = cliModels.map((model) => withCatalogContext(model, byId.get(model.id)));
+  const enriched = cliModels.map((model) => withCatalogMetadata(model, byId.get(model.id)));
   const seen = new Set(enriched.map((model) => model.id));
   const extras: DiscoveredModel[] = [];
 
@@ -166,7 +176,7 @@ export function mergeIdeEnabledModels(
     for (const id of ids) {
       if (seen.has(id)) continue;
       seen.add(id);
-      extras.push(withCatalogContext({ id, name: displayNameForSlug(model, id) }, model));
+      extras.push(withCatalogMetadata({ id, name: displayNameForSlug(model, id) }, model));
     }
   }
 

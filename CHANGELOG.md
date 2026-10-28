@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OpenCode 2 model picker:** reasoning levels are published as variants of one model instead of one picker entry per level, using the same grouping as 1.x. Each variant maps to its concrete Cursor model through `body.cursorModel`.
 - **OpenCode 2 context windows:** models advertise the Cursor IDE catalog's window instead of a flat 200k. The max-mode window is used when the CLI labels the model `1M`; a conservative family fallback covers headless installs.
+- **OpenCode 2 vision:** models the Cursor IDE catalog marks as image-capable now advertise `image` input. The SDK backend already forwarded attachments; the CLI backend now writes them to temporary files and passes `cursor-agent --image`.
 
 ### Fixed
 
