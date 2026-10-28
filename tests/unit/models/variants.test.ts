@@ -39,6 +39,25 @@ describe("models/variants", () => {
     expect(result.groups[0].name).toBe("Claude Opus 5.5");
   });
 
+  it("uses the cursor-agent display name for generated groups", () => {
+    const result = groupCursorModels([
+      { id: "deepseek-v41-flash-1017-none", name: "DeepSeek V4.1 Flash 1017 None" },
+      { id: "deepseek-v41-flash-1017-medium", name: "DeepSeek V4.1 Flash 1017 Medium" },
+      { id: "deepseek-v41-flash-1017-high", name: "DeepSeek V4.1 Flash 1017 High" },
+    ]);
+
+    expect(result.groups[0].name).toBe("DeepSeek V4.1 Flash 1017");
+  });
+
+  it("keeps model qualifiers while removing the default level", () => {
+    const result = groupCursorModels([
+      { id: "claude-fable-5-1-medium", name: "Claude Fable 5.1 1M Medium (NO ZDR)" },
+      { id: "claude-fable-5-1-high", name: "Claude Fable 5.1 1M High (NO ZDR)" },
+    ]);
+
+    expect(result.groups[0].name).toBe("Claude Fable 5.1 1M (NO ZDR)");
+  });
+
   it("keeps ambiguous product models direct", () => {
     const result = groupCursorModels([
       { id: "auto", name: "Auto" },
@@ -193,7 +212,7 @@ describe("models/variants", () => {
     ]);
 
     expect(entries["gpt-5.5"]).toMatchObject({
-      name: "GPT 5.5",
+      name: "GPT-5.5",
       options: { cursorModel: "gpt-5.5-medium" },
       variants: {
         medium: { cursorModel: "gpt-5.5-medium" },

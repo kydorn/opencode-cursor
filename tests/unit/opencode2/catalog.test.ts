@@ -16,7 +16,7 @@ describe("opencode2/catalog", () => {
     expect(grouped).toMatchObject({
       id: "gpt-5.5",
       modelID: "gpt-5.5-medium",
-      name: "GPT 5.5",
+      name: "GPT-5.5 1M",
       body: { cursorModel: "gpt-5.5-medium" },
       limit: { context: 1_000_000, output: 8192 },
     });

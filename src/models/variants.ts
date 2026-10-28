@@ -221,6 +221,26 @@ function formatModelName(modelId: string): string {
   return name;
 }
 
+// Display names come from cursor-agent ("DeepSeek V4.1 Flash 1017 Medium"),
+// not from formatting the id. Strip the default level so the family name does
+// not change when the default variant changes.
+const TRAILING_VARIANT =
+  /\s+(?:No Thinking|Extra High|XHigh|Thinking|Minimal|None|Low|Medium|High|Max|Fast)\s*$/i;
+
+function stripVariantSuffix(name: string): string {
+  const trimmed = name.trim();
+  const parenthetical = /\s*\([^)]*\)\s*$/.exec(trimmed)?.[0] ?? "";
+  let base = parenthetical ? trimmed.slice(0, -parenthetical.length).trim() : trimmed;
+
+  let previous: string;
+  do {
+    previous = base;
+    base = base.replace(TRAILING_VARIANT, "").trim();
+  } while (base !== previous);
+
+  return `${base}${parenthetical}`.trim();
+}
+
 function compareVariants(a: CursorModelVariant, b: CursorModelVariant): number {
   if (a.variant === null) return -1;
   if (b.variant === null) return 1;
@@ -244,9 +264,13 @@ function createGroup(baseId: string, members: CursorModelVariant[]): CursorModel
     }
   }
 
+  const displayName = defaultMember.variant === null
+    ? defaultMember.name
+    : stripVariantSuffix(defaultMember.name);
+
   return {
     baseId,
-    name: defaultMember.variant === null ? defaultMember.name : formatModelName(baseId),
+    name: displayName || formatModelName(baseId),
     defaultCursorModelId: defaultMember.cursorModelId,
     variants,
     members,
