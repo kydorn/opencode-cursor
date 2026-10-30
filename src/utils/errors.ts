@@ -1,6 +1,6 @@
 // src/utils/errors.ts
 
-export type ErrorType = "quota" | "auth" | "network" | "model" | "unknown";
+export type ErrorType = "quota" | "auth" | "provider" | "network" | "model" | "unknown";
 
 /**
  * Thrown when the cursor-agent binary cannot be found at the expected Windows
@@ -89,6 +89,26 @@ export function parseAgentError(stderr: string | unknown): ParsedError {
       userMessage: "Not authenticated with Cursor",
       details: {},
       suggestion: "Run: opencode auth login → Other → cursor-acp, or: cursor-agent login",
+    };
+  }
+
+  // Cursor's upstream model gateway (OpenAI/Anthropic/DeepSeek, ...) is
+  // unreachable or the selected model is failing. The SDK reports this as
+  // ERROR_PROVIDER_ERROR with isRetryable:false, so retrying the same model
+  // rarely helps; switching models does.
+  if (
+    /trouble connecting to the model provider/i.test(clean) ||
+    /unable to reach the model provider/i.test(clean) ||
+    /\bERROR_PROVIDER_ERROR\b/.test(clean) ||
+    /^NonRetriableError:\s*Provider Error\b/i.test(clean)
+  ) {
+    return {
+      type: "provider",
+      recoverable: false,
+      message: clean,
+      userMessage: "Cursor could not reach the model provider",
+      details: {},
+      suggestion: "Retry in a moment or switch to another Cursor model (e.g. auto or composer-2.5)",
     };
   }
 

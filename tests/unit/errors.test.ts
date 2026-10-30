@@ -29,6 +29,25 @@ describe("parseAgentError", () => {
     expect(err.recoverable).toBe(false);
   });
 
+  it("classifies Cursor provider errors as non-recoverable provider failures", () => {
+    const err = parseAgentError(
+      "NonRetriableError: Provider Error We're having trouble connecting to the model provider. " +
+        "This might be temporary - please try again in a moment.",
+    );
+    expect(err.type).toBe("provider");
+    expect(err.recoverable).toBe(false);
+    expect(err.userMessage).toContain("model provider");
+    expect(err.suggestion).toContain("switch");
+  });
+
+  it("classifies the raw ERROR_PROVIDER_ERROR payload", () => {
+    const err = parseAgentError(
+      '{"error":"ERROR_PROVIDER_ERROR","details":{"title":"Provider Error"}}',
+    );
+    expect(err.type).toBe("provider");
+    expect(err.userMessage).toBe("Cursor could not reach the model provider");
+  });
+
   it("classifies network errors as recoverable", () => {
     const err = parseAgentError("Error: fetch failed ECONNREFUSED");
     expect(err.type).toBe("network");

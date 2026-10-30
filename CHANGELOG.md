@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Cursor's `ERROR_PROVIDER_ERROR` ("We're having trouble connecting to the model provider") is reported as a provider failure with a retry/switch-model suggestion instead of raw `NonRetriableError` text.
 - Generated group names keep version segments together: `claude-opus-5-5` now renders as "Claude Opus 5.5", not "Claude Opus 5 5".
 
 ## [2.5.17] - 2026-10-23
